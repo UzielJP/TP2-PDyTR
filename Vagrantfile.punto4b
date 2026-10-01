@@ -1,0 +1,52 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# Vagrantfile - Punto 4b del TP2: Una VM + el host.
+# La VM actúa como servidor, el host actúa como cliente.
+# Se usa forwarded_port para que el host pueda conectarse al servidor
+# de la VM a través de localhost:<puerto_host>.
+#
+# La carpeta donde está este Vagrantfile se monta automáticamente en /vagrant.
+#
+# Uso:
+#   vagrant up
+#   # El servidor se lanza automáticamente en la VM en el puerto 5555.
+#   # Desde el host, compilar y correr el cliente contra localhost:5555.
+#   # Ver run_client_host.sh para los comandos exactos.
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/noble64"
+  config.vm.hostname = "vm-server-host"
+
+  # Redirigir el puerto 5555 de la VM al puerto 5555 del host
+  config.vm.network "forwarded_port", guest: 5555, host: 5555
+  config.vm.network "forwarded_port", guest: 5556, host: 5556
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "512"
+    vb.name = "TP2-vm_server_host"
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+    apt-get update
+    apt-get install -y net-tools build-essential
+
+    # Compilar los programas de servidor
+    cd /vagrant
+    gcc -O2 -o server_timed server_timed.c
+    gcc -O2 -o server_pingpong server_pingpong.c
+
+    mkdir -p /vagrant/results
+  SHELL
+
+  # Lanzar ambos servidores en background (timed en 5555, pingpong en 5556)
+  config.vm.provision "shell", inline: <<-SHELL
+    echo "[provision] Lanzando servidores en la VM..."
+    cd /vagrant
+    nohup ./server_timed 5555 /vagrant/results/srv_host_timed.csv > /vagrant/results/server_timed.log 2>&1 &
+    nohup ./server_pingpong 5556 > /vagrant/results/server_pingpong.log 2>&1 &
+    sleep 1
+    echo "ready" > /vagrant/.server_launched
+    echo "[provision] Servidores lanzados: timed=5555 pingpong=5556"
+  SHELL
+end

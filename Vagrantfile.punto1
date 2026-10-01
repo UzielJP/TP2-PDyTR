@@ -1,0 +1,28 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# Vagrantfile - Punto 1 del TP2: Ubuntu 24.04 LTS (Noble Numbat).
+# Levanta una sola VM con la versión más reciente de Ubuntu LTS disponible
+# en Vagrant Cloud (Canonical), para verificar identificación y terminal.
+#
+# Uso:
+#   vagrant up
+#   vagrant ssh
+#   lsb_release -a   # Para confirmar la versión
+#   uname -r          # Para ver el kernel
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/noble64"
+  config.vm.hostname = "noble-tp2"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "512"
+    vb.name = "TP2-Ubuntu-Noble-24.04"
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+    apt-get update
+    apt-get install -y net-tools joe zip build-essential
+    grep -q "alias ls='ls -la'" /home/vagrant/.bashrc || echo -e "\\nalias ls='ls -la'" >> /home/vagrant/.bashrc
+  SHELL
+end

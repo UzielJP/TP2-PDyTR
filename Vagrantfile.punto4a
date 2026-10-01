@@ -1,0 +1,81 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# Vagrantfile - Punto 4a del TP2: Dos máquinas virtuales (VM-a-VM).
+# Cada VM tiene una IP privada fija en una red interna compartida.
+# El servidor corre en vm_server (192.168.56.10) y el cliente en vm_client (192.168.56.11).
+#
+# La carpeta donde está este Vagrantfile se monta automáticamente en /vagrant
+# de ambas VMs, compartiendo los archivos .c y los resultados .csv.
+#
+# Uso:
+#   vagrant up
+#   # Los experimentos se ejecutan automáticamente via provisioning.
+#   # Los resultados quedan en /vagrant/results/ (= carpeta local results/).
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/noble64"
+
+  # =================== VM SERVIDOR ===================
+  config.vm.define "vm_server" do |server|
+    server.vm.hostname = "vm-server"
+    server.vm.network "private_network", ip: "192.168.56.10"
+
+    server.vm.provider "virtualbox" do |vb|
+      vb.memory = "512"
+      vb.name = "TP2-vm_server"
+    end
+
+    server.vm.provision "shell", inline: <<-SHELL
+      apt-get update
+      apt-get install -y net-tools build-essential
+
+      # Compilar todos los programas C desde /vagrant
+      cd /vagrant
+      gcc -O2 -o server_timed server_timed.c
+      gcc -O2 -o server_pingpong server_pingpong.c
+
+      mkdir -p /vagrant/results
+    SHELL
+
+    # Ejecutar el script del servidor (después del provisioning)
+    server.vm.provision "shell", inline: <<-SHELL
+      echo "[provision] Lanzando script de servidor..."
+      nohup bash /vagrant/run_server.sh > /vagrant/results/server.log 2>&1 &
+      # Crear archivo de señalización para que el cliente sepa que el script arrancó
+      sleep 1
+      echo "ready" > /vagrant/.server_launched
+      echo "[provision] Servidor lanzado en background."
+    SHELL
+  end
+
+  # =================== VM CLIENTE ===================
+  config.vm.define "vm_client" do |client|
+    client.vm.hostname = "vm-client"
+    client.vm.network "private_network", ip: "192.168.56.11"
+
+    client.vm.provider "virtualbox" do |vb|
+      vb.memory = "512"
+      vb.name = "TP2-vm_client"
+    end
+
+    client.vm.provision "shell", inline: <<-SHELL
+      apt-get update
+      apt-get install -y net-tools build-essential
+
+      # Compilar todos los programas C desde /vagrant
+      cd /vagrant
+      gcc -O2 -o client_timed client_timed.c
+      gcc -O2 -o client_pingpong client_pingpong.c
+
+      mkdir -p /vagrant/results
+    SHELL
+
+    # Ejecutar el script del cliente (después del provisioning)
+    client.vm.provision "shell", inline: <<-SHELL
+      echo "[provision] Lanzando script de cliente..."
+      bash /vagrant/run_client.sh "192.168.56.10"
+      echo "[provision] Experimentos del cliente finalizados."
+    SHELL
+  end
+end
